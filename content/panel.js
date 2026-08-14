@@ -2,18 +2,14 @@
 //
 // 使い方:
 //   1. カレンダー上で空いている時間をドラッグ選択する(予定作成のポップアップが出る操作と同じ)
-//      → ドラッグを離すと自動で検出され、一覧に追加される(取り消したい場合はトーストの「取り消す」)
-//   2. 自動で追加されなかった場合は「＋ 選択中の時間を追加」ボタンを押す
-//   3. それでも読み取れない場合は「手動で追加」から日付・開始・終了を直接入力できる
+//   2. パネルの「＋ 選択中の時間を追加」を押す → ポップアップのテキストから日付・時間帯を読み取り一覧に追加
+//   3. 読み取れない場合は「手動で追加」から日付・開始・終了を直接入力できる
 //   4. 好きな件数集めたら「コピー」でクリップボードへ箇条書きテキストをコピー
 //
 // GoogleカレンダーのDOM構造・クラス名は予告なく変わるため、
 // 個々の予定チップのaria-label解析には依存せず、
 // 「ドラッグ選択した直後に出る、日付+時間帯を含む小さなポップアップ要素」だけを
 // その場で1回スキャンする設計にしている(詳細はdetectSelection関数を参照)。
-//
-// 自動検出(mouseup監視)は、単なるクリック(=既存の予定を開いただけ)を誤って
-// 拾わないよう、マウスの移動量が一定以上あった場合のみ発動する(DRAG_THRESHOLD_PX参照)。
 
 (function () {
   "use strict";
@@ -225,16 +221,6 @@
       .actions { display: flex; gap: 6px; margin-top: 8px; }
       .actions button { flex: 1; }
       .toast { margin-top: 6px; color: #188038; font-size: 11px; }
-      .toast .undo-btn {
-        margin-left: 6px;
-        background: transparent;
-        border: none;
-        color: #1a73e8;
-        text-decoration: underline;
-        cursor: pointer;
-        font-size: 11px;
-        padding: 0;
-      }
     </style>
     <div class="panel" id="panel">
       <div class="header" id="header">
@@ -243,7 +229,7 @@
       </div>
       <div class="body">
         <button id="auto-add-btn" class="primary">＋ 選択中の時間を追加</button>
-        <p class="hint">ドラッグして時間を選択すると自動で一覧に追加されます。反応しない場合はこのボタンか、下の「手動で追加」をお使いください。</p>
+        <p class="hint">カレンダー上で空いている時間をドラッグして選択してから押してください</p>
         <p id="detect-error" class="error" hidden></p>
 
         <details class="manual">
@@ -287,42 +273,13 @@
 
   /** @type {{id: string, start: string, end: string}[]} */
   let slots = [];
-  let toastTimer = null;
 
   function showToast(msg) {
-    toastEl.innerHTML = "";
     toastEl.textContent = msg;
     toastEl.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
+    setTimeout(() => {
       toastEl.hidden = true;
     }, 2000);
-  }
-
-  /** 「追加しました」+「取り消す」リンク付きのトーストを表示する */
-  function showUndoToast(id, isAuto) {
-    toastEl.innerHTML = "";
-    const msg = document.createElement("span");
-    msg.textContent = isAuto ? "自動で追加しました" : "追加しました";
-    toastEl.appendChild(msg);
-
-    const undoBtn = document.createElement("button");
-    undoBtn.type = "button";
-    undoBtn.className = "undo-btn";
-    undoBtn.textContent = "取り消す";
-    undoBtn.addEventListener("click", () => {
-      slots = slots.filter((s) => s.id !== id);
-      persist();
-      render();
-      toastEl.hidden = true;
-    });
-    toastEl.appendChild(undoBtn);
-
-    toastEl.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      toastEl.hidden = true;
-    }, 4000);
   }
 
   function persist() {
@@ -361,26 +318,15 @@
     countLabelEl.textContent = hasSlots ? `(${slots.length})` : "";
   }
 
-  /**
-   * @param {string} start ISO文字列
-   * @param {string} end ISO文字列
-   * @param {{auto?: boolean}} [opts] auto: ドラッグ検出による自動追加かどうか
-   */
-  function addSlot(start, end, opts) {
-    const isAuto = !!(opts && opts.auto);
-    const isDuplicate = slots.some((s) => s.start === start && s.end === end);
-    if (isDuplicate) {
-      // 自動追加(同じポップアップに対してmouseupが何度も発生する場合など)は静かに無視し、
-      // 手動操作の場合だけ「既に追加済み」であることを知らせる
-      if (!isAuto) showToast("すでに追加されています");
-      return;
-    }
-
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    slots.push({ id, start, end });
+  function addSlot(start, end) {
+    slots.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      start,
+      end,
+    });
     persist();
     render();
-    showUndoToast(id, isAuto);
+    showToast("追加しました");
   }
 
   autoAddBtn.addEventListener("click", () => {
@@ -394,51 +340,6 @@
     }
     addSlot(detected.start, detected.end);
   });
-
-  // ---- ドラッグ選択の自動検出 ----
-  // カレンダー上で時間帯をドラッグ選択したら、パネルまで手を伸ばさなくても
-  // 自動で一覧に追加されるようにする。単なるクリック(既存の予定を開く等)は
-  // 移動量がほぼ0なので、DRAG_THRESHOLD_PX未満は対象外にして誤検出を防ぐ。
-  const DRAG_THRESHOLD_PX = 10;
-  const AUTO_DETECT_DELAYS_MS = [150, 400, 900]; // Googleのポップアップ描画待ち。数回リトライする
-  let dragStartPoint = null;
-
-  document.addEventListener(
-    "mousedown",
-    (e) => {
-      if (host.contains(e.target)) return; // パネル内の操作は対象外
-      dragStartPoint = { x: e.clientX, y: e.clientY };
-    },
-    true
-  );
-
-  document.addEventListener(
-    "mouseup",
-    (e) => {
-      if (!dragStartPoint) return;
-      const dx = e.clientX - dragStartPoint.x;
-      const dy = e.clientY - dragStartPoint.y;
-      dragStartPoint = null;
-      if (host.contains(e.target)) return;
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-
-      let attempt = 0;
-      const tryDetect = () => {
-        const detected = detectSelection();
-        if (detected) {
-          addSlot(detected.start, detected.end, { auto: true });
-          return;
-        }
-        attempt++;
-        if (attempt < AUTO_DETECT_DELAYS_MS.length) {
-          setTimeout(tryDetect, AUTO_DETECT_DELAYS_MS[attempt] - AUTO_DETECT_DELAYS_MS[attempt - 1]);
-        }
-        // 最終的に見つからなくても、自動検出では通知を出さない(誤操作時のノイズを避けるため)
-      };
-      setTimeout(tryDetect, AUTO_DETECT_DELAYS_MS[0]);
-    },
-    true
-  );
 
   manualAddBtn.addEventListener("click", () => {
     detectErrorEl.hidden = true;
