@@ -256,7 +256,7 @@
     </style>
     <div class="panel" id="panel">
       <div class="header" id="header">
-        <span class="title">空き時間コピー<span class="count" id="count-label"></span></span>
+        <span class="title">🕓 空き時間コピーくん<span class="count" id="count-label"></span></span>
         <button id="toggle-btn" title="最小化/展開">▁</button>
       </div>
       <div class="body">
