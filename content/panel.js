@@ -3,8 +3,7 @@
 // 使い方:
 //   1. カレンダー上で空いている時間をドラッグ選択する(予定作成のポップアップが出る操作と同じ)
 //   2. パネルの「＋ 選択中の時間を追加」を押す → ポップアップのテキストから日付・時間帯を読み取り一覧に追加
-//   3. 読み取れない場合は「手動で追加」から日付・開始・終了を直接入力できる
-//   4. 好きな件数集めたら「コピー」でクリップボードへ箇条書きテキストをコピー
+//   3. 好きな件数集めたら「コピー」でクリップボードへ箇条書きテキストをコピー
 //
 // GoogleカレンダーのDOM構造・クラス名は予告なく変わるため、
 // 個々の予定チップのaria-label解析には依存せず、
@@ -224,15 +223,6 @@
       }
       .hint { color: #666; font-size: 11px; margin: 6px 0; }
       .error { color: #d93025; font-size: 11px; margin: 6px 0; }
-      details.manual { margin: 8px 0; }
-      details.manual summary { cursor: pointer; font-size: 12px; color: #1a73e8; }
-      .manual-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
-      .manual-fields input {
-        font-size: 12px;
-        padding: 3px;
-        border: 1px solid #dadce0;
-        border-radius: 4px;
-      }
       ul#slot-list { list-style: none; padding: 0; margin: 8px 0; max-height: 160px; overflow-y: auto; }
       ul#slot-list li {
         display: flex;
@@ -264,17 +254,6 @@
         <p class="hint">カレンダー上で空いている時間をドラッグして選択してから押してください</p>
         <p id="detect-error" class="error" hidden></p>
 
-        <details class="manual">
-          <summary>うまく検出できない場合は手動で追加</summary>
-          <div class="manual-fields">
-            <input type="date" id="manual-date" />
-            <input type="time" id="manual-start" />
-            <span>〜</span>
-            <input type="time" id="manual-end" />
-            <button id="manual-add-btn" class="secondary">追加</button>
-          </div>
-        </details>
-
         <ul id="slot-list"></ul>
         <p id="empty-note" class="empty-note">まだ追加された時間帯はありません</p>
 
@@ -293,10 +272,6 @@
   const toggleBtn = shadow.getElementById("toggle-btn");
   const autoAddBtn = shadow.getElementById("auto-add-btn");
   const detectErrorEl = shadow.getElementById("detect-error");
-  const manualDate = shadow.getElementById("manual-date");
-  const manualStart = shadow.getElementById("manual-start");
-  const manualEnd = shadow.getElementById("manual-end");
-  const manualAddBtn = shadow.getElementById("manual-add-btn");
   const listEl = shadow.getElementById("slot-list");
   const emptyNoteEl = shadow.getElementById("empty-note");
   const copyBtn = shadow.getElementById("copy-btn");
@@ -399,30 +374,11 @@
     const detected = detectSelection();
     if (!detected) {
       detectErrorEl.textContent =
-        "選択中の時間帯が見つかりませんでした。カレンダー上でドラッグして予定作成ポップアップを表示してから押すか、下の「手動で追加」をお使いください。";
+        "選択中の時間帯が見つかりませんでした。カレンダー上でドラッグして予定作成ポップアップを表示してから、もう一度押してください。";
       detectErrorEl.hidden = false;
       return;
     }
     addSlot(detected.start, detected.end);
-  });
-
-  manualAddBtn.addEventListener("click", () => {
-    detectErrorEl.hidden = true;
-    if (!manualDate.value || !manualStart.value || !manualEnd.value) {
-      detectErrorEl.textContent = "日付・開始・終了をすべて入力してください。";
-      detectErrorEl.hidden = false;
-      return;
-    }
-    const start = new Date(`${manualDate.value}T${manualStart.value}:00`);
-    const end = new Date(`${manualDate.value}T${manualEnd.value}:00`);
-    if (end <= start) {
-      detectErrorEl.textContent = "終了時刻は開始時刻より後にしてください。";
-      detectErrorEl.hidden = false;
-      return;
-    }
-    addSlot(start.toISOString(), end.toISOString());
-    manualStart.value = "";
-    manualEnd.value = "";
   });
 
   copyBtn.addEventListener("click", async () => {

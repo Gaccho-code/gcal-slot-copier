@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "空き時間コピーくん",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "Googleカレンダー上でドラッグ選択した空き時間帯を一覧にまとめ、コピー用の箇条書きテキストを作成します。",
   "action": {
     "default_icon": {
