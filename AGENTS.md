@@ -2,51 +2,52 @@
 
 ## 概要
 
-Manifest V3のChrome拡張機能。ビルドツールは使わず、素のES modules(popup/options)と
-classic script(content script)だけで構成されている。`npm install` や build コマンドは不要。
+Manifest V3のChrome拡張機能。ビルドツールは使わず、素のJS(classic script)だけで構成されている。
+`npm install` や build コマンドは不要。
 
-## アーキテクチャ
+## アーキテクチャ(v0.2〜: 手動選択方式)
 
 ```
-manifest.json          … MV3マニフェスト。permissions は activeTab / scripting / storage のみ
-popup/popup.js          … ポップアップのエントリポイント。タブ確認→content-script注入→計算→表示
-options/options.js      … オプション画面。chrome.storage.sync に設定を保存
-content/content-script.js … calendar.google.com の週表示ページに都度注入される薄いスキャナ
-shared/                 … popup/options からimportして使う純粋関数群(日時ユーティリティ、区間演算)
+manifest.json               … MV3マニフェスト。permissions は storage のみ
+background/service-worker.js … アイコンクリックをcontent scriptへ中継するだけの薄いworker
+content/panel.js             … calendar.google.com の全ページに常駐するフローティングパネル本体
 ```
 
-- `content-script.js` は `content_scripts` として常駐登録していない。popup操作のたびに
-  `chrome.scripting.executeScript` で対象タブに注入し、`window.__gcalSlotCopierScan()` を
-  呼び出す2段階方式。理由: 権限を最小化し、ページを開いているだけで常時DOM監視するコードを
-  走らせないため。
-- 空き時間の計算(`shared/free-slot-calculator.js`)はcontent-script側ではなくpopup側で行う。
-  content-scriptは「週の日付一覧」と「予定の開始/終了時刻」を返すだけに徹する。
+v0.1では「カレンダー画面のDOMを自動スキャンして空き時間を計算する」方式だったが、
+Googleカレンダーの実際のDOM構造・`aria-label`の文言パターンが想定と合わず検出に失敗したため、
+**v0.2で「ユーザーが目で見て空いている時間をドラッグ選択し、その選択をパネルに取り込む」方式に
+設計変更した。** この経緯は重要なので、今後DOM解析方式に戻すことを検討する場合は
+この制約を踏まえること。
 
-## 重要な運用上の注意: GoogleカレンダーのDOM変更
+### content/panel.js の仕組み
 
-GoogleカレンダーのHTML構造・クラス名は**予告なく変更される**。`content/content-script.js` 内の
-セレクタ(`HEADER_SELECTORS` / `EVENT_CHIP_SELECTORS`)や `aria-label` の正規表現
-(`HEADER_PATTERN_JA` / `EVENT_LABEL_PATTERN` 等)が動かなくなった場合の対処:
+- `content_scripts` として `calendar.google.com` の全ページに常駐登録(常時実行、都度注入ではない)
+- Shadow DOM(`host.attachShadow`)でパネルを構築し、ページ本体のCSSと干渉しないようにしている
+- 「＋ 選択中の時間を追加」ボタンを押した時だけ、`detectSelection()` が1回DOMをスキャンする:
+  1. `[role="dialog"]` 要素、および body直下にある「ポップアップサイズ(500px未満四方)」の要素を候補として集める
+  2. 各候補の `innerText` に対して「日付パターン(`○月○日`)」と「時間帯パターン(`HH:MM〜HH:MM`等)」の
+     両方がマッチするものを探す(個々の予定チップの`aria-label`は解析しない)
+  3. マッチしなければ `null` を返し、パネル側は「手動で追加」を促すエラーメッセージを表示する
+- 一覧(`slots`)は `chrome.storage.local` に保存し、ページ再読み込み後も復元する
 
-1. 実際にGoogleカレンダーの週表示をDevToolsで開き、日付ヘッダやイベントチップ要素の
-   現在の `role` / `aria-label` / `data-*` 属性を確認する。
-2. クラス名(難読化された自動生成文字列)には依存しない。`role` や `aria-*` など
-   セマンティックな属性を優先してセレクタ候補に追加する。
-3. 既存のセレクタ配列に新しい候補を**追加**する形で直し、古い候補も残しておく
-   (Google側がA/Bテスト等で複数のDOM構造を混在させる可能性があるため)。
-4. セレクタ・正規表現が全滅した場合、`content-script.js` は `HEADER_NOT_FOUND` /
-   `HEADER_PARSE_FAILED` / `SCAN_EXCEPTION` のいずれかを返す。これらは
-   `shared/constants.js` の `ERROR_MESSAGES` でユーザー向け日本語メッセージに変換される。
-   **サイレントに失敗させず、必ずエラー表示するようにすること。**
+## 重要な運用上の注意: Googleカレンダーの表記ゆれ
+
+`content/panel.js` 内の `DATE_PATTERN` / `TIME_RANGE_PATTERN` が実際のポップアップ文言と
+合わず検出に失敗した場合の対処:
+
+1. 実際に選択操作をしてDevToolsで予定作成ポップアップのDOMを確認し、`innerText` がどう見えるかを確認する
+2. 日付は「○月○日」、時間帯は「HH:MM + 区切り文字(〜/～/~/-/–/—) + HH:MM」を含む形を前提にしている。
+   区切り文字や午前/午後の位置が違う場合は正規表現に候補を**追加**する(既存の候補は残す)
+3. `[role="dialog"]` で見つからない場合のフォールバック(body直下のポップアップサイズ要素)条件
+   (`rect.width < 500 && rect.height < 500`)がGoogle側のレイアウト変更で外れていないか確認する
+4. それでも解決しない・調査に時間がかかる場合は、「手動で追加」欄(`manual-date`/`manual-start`/`manual-end`)
+   が常に動作する保険になっているため、致命的な機能不全にはならない設計になっている
 
 ## 既知の未実装事項
 
-- `parseFromPixelPosition()`(ピクセル位置からの時刻推定フォールバック)は
-  v0.1時点では未実装(`content/content-script.js` 内にコメントあり)。
-  `aria-label` 解析に失敗したイベントは `unparsedCount` としてカウントされ、
-  popup側で注意メッセージが表示されるのみに留まる。
-- `icons/*.png` は単色のプレースホルダー画像(`icons/icon16.png` 等)。
-  正式なアイコンに差し替える際は同じファイル名・サイズ(16/48/128)を維持すること。
+- 複数の候補要素が同時にマッチした場合、最初に見つかったものを採用する(優先順位付けはしていない)
+- `icons/*.png` は単色のプレースホルダー画像。正式なアイコンに差し替える際は
+  同じファイル名・サイズ(16/48/128)を維持すること
 
 ## 動作確認
 

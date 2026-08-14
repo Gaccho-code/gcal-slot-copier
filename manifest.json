@@ -1,25 +1,30 @@
 {
   "manifest_version": 3,
   "name": "GCal 空き時間コピー",
-  "version": "0.1.0",
-  "description": "Googleカレンダーの週表示から空き時間を検出し、コピー用の箇条書きテキストを生成します。",
+  "version": "0.2.0",
+  "description": "Googleカレンダー上でドラッグ選択した空き時間帯を一覧にまとめ、コピー用の箇条書きテキストを作成します。",
   "action": {
-    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
-    }
-  },
-  "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
+    },
+    "default_title": "空き時間パネルの表示/最小化を切り替え"
   },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": []
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://calendar.google.com/*"],
+      "js": ["content/panel.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
