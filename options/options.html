@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>GCal 空き時間コピー - オプション</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <h1>GCal 空き時間コピー - オプション</h1>
+
+    <form id="options-form">
+      <div class="field">
+        <label for="start-hour">営業時間(開始)</label>
+        <select id="start-hour"></select>
+      </div>
+
+      <div class="field">
+        <label for="end-hour">営業時間(終了)</label>
+        <select id="end-hour"></select>
+      </div>
+
+      <div class="field">
+        <label for="min-duration">最低所要時間(分)</label>
+        <input id="min-duration" type="number" min="5" max="480" step="5" />
+      </div>
+
+      <div class="field checkbox-field">
+        <label>
+          <input id="weekdays-only" type="checkbox" />
+          平日のみを対象にする
+        </label>
+      </div>
+
+      <p id="error-list" class="error" hidden></p>
+
+      <button type="submit">保存</button>
+      <p id="saved-toast" class="toast" hidden>保存しました</p>
+    </form>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

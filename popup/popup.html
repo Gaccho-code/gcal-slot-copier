@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>GCal 空き時間コピー</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main>
+    <h1>空いている日時</h1>
+
+    <div id="state-loading" class="state" hidden>
+      <p>解析中…</p>
+    </div>
+
+    <div id="state-error" class="state" hidden>
+      <p id="error-message"></p>
+      <button id="retry-button" type="button">再試行</button>
+    </div>
+
+    <div id="state-result" class="state" hidden>
+      <textarea id="preview" rows="4" readonly></textarea>
+      <p id="warning-note" class="note" hidden>
+        一部の予定を正しく認識できていない可能性があります。
+      </p>
+      <button id="copy-button" type="button">コピー</button>
+      <p id="toast" class="toast" hidden>コピーしました</p>
+    </div>
+
+    <footer>
+      <a id="options-link" href="#">オプションを開く</a>
+    </footer>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
