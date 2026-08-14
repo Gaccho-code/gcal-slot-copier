@@ -305,6 +305,7 @@
 
   /** @type {{id: string, start: string, end: string}[]} */
   let slots = [];
+  let contextInvalidated = false;
 
   function showToast(msg) {
     toastEl.textContent = msg;
@@ -314,8 +315,40 @@
     }, 2000);
   }
 
+  /**
+   * 拡張機能を再読み込み/更新した後も、このタブに古いバージョンのスクリプトが残っていると
+   * chrome.* API呼び出しが "Extension context invalidated" で失敗するようになる。
+   * この状態を検知したら未捕捉エラーを出さず、ページ再読み込みを促すメッセージに置き換える。
+   */
+  function isExtensionContextValid() {
+    try {
+      return !!(chrome && chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function handleContextInvalidated() {
+    if (contextInvalidated) return;
+    contextInvalidated = true;
+    panelEl.classList.remove("collapsed");
+    const body = shadow.querySelector(".body");
+    if (body) {
+      body.innerHTML =
+        '<p class="error">拡張機能が更新されました。このページを再読み込みしてください。</p>';
+    }
+  }
+
   function persist() {
-    chrome.storage.local.set({ [STORAGE_KEY_SLOTS]: slots });
+    if (!isExtensionContextValid()) {
+      handleContextInvalidated();
+      return;
+    }
+    try {
+      chrome.storage.local.set({ [STORAGE_KEY_SLOTS]: slots });
+    } catch (e) {
+      handleContextInvalidated();
+    }
   }
 
   function sortedSlots() {
@@ -422,7 +455,15 @@
   function setCollapsed(collapsed) {
     panelEl.classList.toggle("collapsed", collapsed);
     toggleBtn.textContent = collapsed ? "▔" : "▁";
-    chrome.storage.local.set({ [STORAGE_KEY_COLLAPSED]: collapsed });
+    if (!isExtensionContextValid()) {
+      handleContextInvalidated();
+      return;
+    }
+    try {
+      chrome.storage.local.set({ [STORAGE_KEY_COLLAPSED]: collapsed });
+    } catch (e) {
+      handleContextInvalidated();
+    }
   }
 
   headerEl.addEventListener("click", (e) => {
@@ -436,20 +477,32 @@
 
   // 保存済みの状態を復元(ページ再読み込みをまたいで一覧を保持する)
   // 初回(未保存)はデフォルトで最小化しておく。一度でも展開した場合はその状態を記憶する。
-  chrome.storage.local.get([STORAGE_KEY_SLOTS, STORAGE_KEY_COLLAPSED], (result) => {
-    if (Array.isArray(result[STORAGE_KEY_SLOTS])) {
-      slots = result[STORAGE_KEY_SLOTS];
-    }
-    render();
-    if (result[STORAGE_KEY_COLLAPSED] !== false) {
-      setCollapsed(true);
-    }
-  });
+  try {
+    chrome.storage.local.get([STORAGE_KEY_SLOTS, STORAGE_KEY_COLLAPSED], (result) => {
+      if (chrome.runtime.lastError) {
+        handleContextInvalidated();
+        return;
+      }
+      if (Array.isArray(result[STORAGE_KEY_SLOTS])) {
+        slots = result[STORAGE_KEY_SLOTS];
+      }
+      render();
+      if (result[STORAGE_KEY_COLLAPSED] !== false) {
+        setCollapsed(true);
+      }
+    });
+  } catch (e) {
+    handleContextInvalidated();
+  }
 
   // 拡張アイコンのクリックで表示/最小化を切り替える
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message && message.type === "GCAL_SLOT_COPIER_TOGGLE_PANEL") {
-      setCollapsed(!panelEl.classList.contains("collapsed"));
-    }
-  });
+  try {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message && message.type === "GCAL_SLOT_COPIER_TOGGLE_PANEL") {
+        setCollapsed(!panelEl.classList.contains("collapsed"));
+      }
+    });
+  } catch (e) {
+    // リスナー登録自体が失敗するケースは稀だが、念のため無視する
+  }
 })();

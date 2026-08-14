@@ -43,6 +43,21 @@ Googleカレンダーの実際のDOM構造・`aria-label`の文言パターン�
 4. それでも解決しない・調査に時間がかかる場合は、「手動で追加」欄(`manual-date`/`manual-start`/`manual-end`)
    が常に動作する保険になっているため、致命的な機能不全にはならない設計になっている
 
+## 拡張機能の再読み込みと "Extension context invalidated"
+
+`chrome://extensions` で拡張機能を再読み込みしても、既に開いているタブに残っている
+古いバージョンのcontent scriptは自動では終了しない。その状態で古いスクリプトが
+`chrome.storage.local.set()` 等を呼ぶと `Extension context invalidated` という
+未捕捉エラーがコンソールに出る(実害はなく、そのタブをリロードすれば解消する)。
+
+`content/panel.js` では `isExtensionContextValid()` / `handleContextInvalidated()` で
+これを検知し、`persist()` / `setCollapsed()` / 初期化時の `chrome.storage.local.get()` /
+`chrome.runtime.onMessage.addListener()` をtry/catchで保護している。検知した場合は
+パネル本体を「拡張機能が更新されました。このページを再読み込みしてください。」という
+メッセージに置き換える。新たに `chrome.*` API呼び出しを追加する際は、同様に
+`isExtensionContextValid()` のチェック(または try/catch + `handleContextInvalidated()`)を
+必ず入れること。
+
 ## 既知の未実装事項
 
 - 複数の候補要素が同時にマッチした場合、最初に見つかったものを採用する(優先順位付けはしていない)
