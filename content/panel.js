@@ -403,12 +403,13 @@
   });
 
   // 保存済みの状態を復元(ページ再読み込みをまたいで一覧を保持する)
+  // 初回(未保存)はデフォルトで最小化しておく。一度でも展開した場合はその状態を記憶する。
   chrome.storage.local.get([STORAGE_KEY_SLOTS, STORAGE_KEY_COLLAPSED], (result) => {
     if (Array.isArray(result[STORAGE_KEY_SLOTS])) {
       slots = result[STORAGE_KEY_SLOTS];
     }
     render();
-    if (result[STORAGE_KEY_COLLAPSED]) {
+    if (result[STORAGE_KEY_COLLAPSED] !== false) {
       setCollapsed(true);
     }
   });
