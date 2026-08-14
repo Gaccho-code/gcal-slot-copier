@@ -26,14 +26,46 @@
     return String(n).padStart(2, "0");
   }
 
-  /** {start, end} (ISO文字列) を「・8/18(火) 10:00〜11:00」の形式に整形する */
+  /** {start, end} (ISO文字列) を「・8/18(火) 10:00〜11:00」の形式に整形する(一覧表示用) */
   function formatBullet(slot) {
     const s = new Date(slot.start);
     const e = new Date(slot.end);
-    const w = WEEKDAY_JA[s.getDay()];
-    const m = s.getMonth() + 1;
-    const d = s.getDate();
-    return `・${m}/${d}(${w}) ${pad2(s.getHours())}:${pad2(s.getMinutes())}〜${pad2(e.getHours())}:${pad2(e.getMinutes())}`;
+    return `・${formatDateLabel(s)} ${formatTimeRange(slot)}`;
+  }
+
+  /** Dateを「8/18(火)」の形式に整形する */
+  function formatDateLabel(date) {
+    const w = WEEKDAY_JA[date.getDay()];
+    return `${date.getMonth() + 1}/${date.getDate()}(${w})`;
+  }
+
+  /** {start, end} (ISO文字列) を「10:00〜11:00」の形式に整形する */
+  function formatTimeRange(slot) {
+    const s = new Date(slot.start);
+    const e = new Date(slot.end);
+    return `${pad2(s.getHours())}:${pad2(s.getMinutes())}〜${pad2(e.getHours())}:${pad2(e.getMinutes())}`;
+  }
+
+  /**
+   * コピー用テキストを組み立てる。同じ日付の枠は1行にまとめ、時間帯を「、」で区切る。
+   * 例: ・8/18(火) 10:00〜11:00、14:00〜15:00
+   */
+  function buildCopyText(slotList) {
+    const sorted = [...slotList].sort((a, b) => new Date(a.start) - new Date(b.start));
+    const groups = [];
+    for (const slot of sorted) {
+      const d = new Date(slot.start);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.key === key) {
+        lastGroup.slots.push(slot);
+      } else {
+        groups.push({ key, date: d, slots: [slot] });
+      }
+    }
+    return groups
+      .map((g) => `・${formatDateLabel(g.date)} ${g.slots.map(formatTimeRange).join("、")}`)
+      .join("\n");
   }
 
   /** 月日から、今日に一番近い年を推定してDateを作る(年またぎの誤判定を防ぐ) */
@@ -361,7 +393,7 @@
   });
 
   copyBtn.addEventListener("click", async () => {
-    const text = sortedSlots().map(formatBullet).join("\n");
+    const text = buildCopyText(slots);
     try {
       await navigator.clipboard.writeText(text);
       showToast("コピーしました");
