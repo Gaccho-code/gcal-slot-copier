@@ -178,13 +178,16 @@
         overflow: hidden;
         font-size: 13px;
         color: #202124;
+        transition: opacity .15s;
       }
       .panel.collapsed .body { display: none; }
+      .panel.collapsed { opacity: .5; }
+      .panel.collapsed:hover { opacity: 1; }
       .header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: #1a73e8;
+        background: #039be5;
         color: #fff;
         padding: 8px 10px;
         cursor: pointer;
@@ -202,7 +205,7 @@
       }
       .body { padding: 10px; }
       button.primary {
-        background: #1a73e8;
+        background: #039be5;
         color: #fff;
         border: none;
         border-radius: 4px;
