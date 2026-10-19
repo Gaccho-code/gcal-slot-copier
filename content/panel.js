@@ -161,7 +161,7 @@
   host.style.position = "fixed";
   host.style.zIndex = "2147483647";
   host.style.bottom = "16px";
-  host.style.right = "82px";
+  host.style.right = "87px";
   document.documentElement.appendChild(host);
   const shadow = host.attachShadow({ mode: "open" });
 
